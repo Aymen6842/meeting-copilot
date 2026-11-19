@@ -8,10 +8,14 @@ import subprocess
 import urllib.error
 import urllib.request
 import uuid
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
+import boto3
 import pytest
 from alembic.config import Config as AlembicConfig
 from alembic.script import ScriptDirectory
+from botocore.exceptions import ClientError
 
 from tests.stack.compose_files import (
     ENV_EXAMPLE_FILE,
@@ -20,6 +24,9 @@ from tests.stack.compose_files import (
     read_env_file,
     services,
 )
+
+if TYPE_CHECKING:  # stub-only package, installed with the dev dependencies
+    from mypy_boto3_s3 import S3Client
 
 pytestmark = pytest.mark.stack
 
@@ -94,25 +101,85 @@ def test_storage_init_finished_successfully() -> None:
     assert init["ExitCode"] == 0
 
 
-def test_bucket_exists_for_authenticated_clients() -> None:
-    # Reuses the storage-init service: same AWS CLI image, credentials and bucket name.
-    result = subprocess.run(
-        [  # noqa: S607 - docker from PATH
-            "docker",
-            "compose",
-            "run",
-            "--rm",
-            "--no-deps",
-            "storage-init",
-            'aws --endpoint-url http://storage:9000 s3api head-bucket --bucket "$STORAGE_BUCKET"',
-        ],
+def app_storage_client() -> "S3Client":
+    """S3 client with the API's own credentials, as storage-init created them."""
+    return boto3.client(
+        "s3",
+        endpoint_url=STORAGE_URL,
+        region_name="us-east-1",
+        aws_access_key_id=env_value("STORAGE_APP_ACCESS_KEY"),
+        aws_secret_access_key=env_value("STORAGE_APP_SECRET_KEY"),
+    )
+
+
+def compose_output(*arguments: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(  # noqa: S603 - fixed docker compose command, test-defined arguments
+        ["docker", "compose", *arguments],  # noqa: S607 - docker from PATH
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         check=False,
     )
 
+
+def test_app_user_can_manage_objects_in_the_bucket() -> None:
+    client, bucket, key = app_storage_client(), bucket_name(), f"stack-test/{uuid.uuid4()}.wav"
+
+    client.head_bucket(Bucket=bucket)
+    client.put_object(Bucket=bucket, Key=key, Body=b"audio", ContentType="audio/wav")
+    assert client.head_object(Bucket=bucket, Key=key)["ContentLength"] == len(b"audio")
+    assert client.get_object(Bucket=bucket, Key=key)["Body"].read() == b"audio"
+    client.delete_object(Bucket=bucket, Key=key)
+    with pytest.raises(ClientError, match="404"):
+        client.head_object(Bucket=bucket, Key=key)
+
+
+ForbiddenCall = Callable[["S3Client", str], object]
+FORBIDDEN_CALLS: dict[str, ForbiddenCall] = {
+    "create a bucket": lambda client, _: client.create_bucket(Bucket=f"other-{uuid.uuid4().hex}"),
+    "delete the bucket": lambda client, bucket: client.delete_bucket(Bucket=bucket),
+    "change the bucket policy": lambda client, bucket: client.put_bucket_policy(
+        Bucket=bucket, Policy="{}"
+    ),
+    "change the bucket cors": lambda client, bucket: client.delete_bucket_cors(Bucket=bucket),
+}
+
+
+@pytest.mark.parametrize("call", FORBIDDEN_CALLS.values(), ids=FORBIDDEN_CALLS.keys())
+def test_app_user_cannot_administer_storage(call: ForbiddenCall) -> None:
+    with pytest.raises(ClientError, match="AccessDenied"):
+        call(app_storage_client(), bucket_name())
+
+
+def test_app_user_sees_only_its_bucket() -> None:
+    buckets = app_storage_client().list_buckets()["Buckets"]
+
+    assert [bucket.get("Name") for bucket in buckets] == [bucket_name()]
+
+
+def test_app_user_cannot_use_the_admin_api() -> None:
+    result = compose_output(
+        "run",
+        "--rm",
+        "--no-deps",
+        "--entrypoint",
+        "sh",
+        "storage-init",
+        "-c",
+        'rc alias set app "$STORAGE_ENDPOINT" "$STORAGE_APP_ACCESS_KEY" "$STORAGE_APP_SECRET_KEY"'
+        " >/dev/null && rc admin user ls app",
+    )
+
+    assert result.returncode != 0
+    assert "denied" in (result.stdout + result.stderr).lower()
+
+
+def test_api_connects_with_the_app_user_not_root() -> None:
+    result = compose_output("exec", "-T", "api", "printenv", "APP_STORAGE__ACCESS_KEY")
+
     assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == env_value("STORAGE_APP_ACCESS_KEY")
+    assert result.stdout.strip() != env_value("STORAGE_ROOT_USER")
 
 
 def test_bucket_refuses_anonymous_listing() -> None:

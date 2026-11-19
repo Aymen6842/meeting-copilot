@@ -9,8 +9,9 @@ x-app-environment: &app-environment
   APP_STORAGE__ENDPOINT_URL: http://storage:9000
   # Browsers reach storage on the published port; pre-signed URLs are signed for this host.
   APP_STORAGE__PUBLIC_ENDPOINT_URL: http://localhost:9000
-  APP_STORAGE__ACCESS_KEY: ${STORAGE_ROOT_USER}
-  APP_STORAGE__SECRET_KEY: ${STORAGE_ROOT_PASSWORD}
+  # The app's own user, limited to the bucket (created by storage-init), never the root one.
+  APP_STORAGE__ACCESS_KEY: ${STORAGE_APP_ACCESS_KEY}
+  APP_STORAGE__SECRET_KEY: ${STORAGE_APP_SECRET_KEY}
   APP_STORAGE__BUCKET: ${STORAGE_BUCKET}
 
 services:
@@ -71,25 +72,26 @@ services:
       start_period: 5s
     restart: unless-stopped
 
-  # One-shot: creates the private bucket, then exits. Safe to re-run.
+  # One-shot: creates the private bucket and the app's own storage user, then exits.
+  # Safe to re-run. The only service besides storage that receives the root credentials.
   storage-init:
-    image: amazon/aws-cli:2.41.1
+    image: rustfs/rustfs:1.0.6 # same image as storage, for its `rc` admin client
     depends_on:
       storage:
         condition: service_healthy
     environment:
-      AWS_ACCESS_KEY_ID: ${STORAGE_ROOT_USER}
-      AWS_SECRET_ACCESS_KEY: ${STORAGE_ROOT_PASSWORD}
-      AWS_DEFAULT_REGION: us-east-1
+      STORAGE_ENDPOINT: http://storage:9000
       STORAGE_BUCKET: ${STORAGE_BUCKET:?set STORAGE_BUCKET in .env}
-    entrypoint: ["sh", "-c"]
-    command:
-      - >-
-        aws --endpoint-url http://storage:9000 s3api head-bucket --bucket "$$STORAGE_BUCKET"
-        >/dev/null 2>&1
-        || aws --endpoint-url http://storage:9000 s3api create-bucket --bucket "$$STORAGE_BUCKET"
-        >/dev/null
-        && echo "bucket $$STORAGE_BUCKET is ready"
+      STORAGE_ROOT_USER: ${STORAGE_ROOT_USER}
+      STORAGE_ROOT_PASSWORD: ${STORAGE_ROOT_PASSWORD}
+      STORAGE_APP_ACCESS_KEY: ${STORAGE_APP_ACCESS_KEY:?set STORAGE_APP_ACCESS_KEY in .env}
+      STORAGE_APP_SECRET_KEY: ${STORAGE_APP_SECRET_KEY:?set STORAGE_APP_SECRET_KEY in .env}
+      HOME: /tmp # rc saves the root login under $$HOME: keep it in memory, not on disk
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./infra/storage:/init:ro
+    entrypoint: ["sh", "/init/init.sh"]
     restart: "no"
 
   # One-shot: applies database migrations, then exits. api and worker start only after it.

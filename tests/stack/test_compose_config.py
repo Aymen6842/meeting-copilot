@@ -1,5 +1,6 @@
 """Static checks on docker-compose.yml and .env.example. No Docker needed."""
 
+import json
 import re
 from urllib.parse import urlsplit
 
@@ -14,6 +15,9 @@ from tests.stack.compose_files import (
     services,
 )
 
+STORAGE_INIT_DIR = REPO_ROOT / "infra" / "storage"
+IN_CONTAINER_TMP = "/tmp"  # noqa: S108 - a path inside the storage-init container, not here
+APP_POLICY_ACTIONS = {"s3:ListBucket", "s3:GetObject", "s3:PutObject", "s3:DeleteObject"}
 SECRET_NAME = re.compile(r"PASSWORD|SECRET|_KEY|ROOT_USER")
 PLACEHOLDER_PREFIX = "change-me"
 PINNED_TAG = re.compile(r":[0-9][^:@]*$")  # a version tag, not "latest" or a bare name
@@ -106,10 +110,62 @@ def test_real_env_file_is_gitignored() -> None:
 
 
 def test_storage_init_never_grants_public_access() -> None:
-    init_command = str(services()["storage-init"]["command"]).lower()
+    setup = (STORAGE_INIT_DIR / "init.sh").read_text(encoding="utf-8").lower()
+    setup += (STORAGE_INIT_DIR / "app-policy.json").read_text(encoding="utf-8").lower()
 
-    for forbidden in ("put-bucket-policy", "put-bucket-acl", "public-read", "anonymous"):
-        assert forbidden not in init_command
+    for forbidden in ("anonymous", "public", "put-bucket-policy", '"principal"'):
+        assert forbidden not in setup
+
+
+def test_only_storage_and_its_init_receive_the_root_credentials() -> None:
+    receivers = {
+        name
+        for name, service in services().items()
+        if "STORAGE_ROOT_" in json.dumps(service.get("environment", {}))
+    }
+
+    assert receivers == {"storage", "storage-init"}
+
+
+@pytest.mark.parametrize("name", ["api", "worker"])
+def test_app_services_use_the_bucket_scoped_storage_user(name: str) -> None:
+    environment = services()[name]["environment"]
+
+    assert environment["APP_STORAGE__ACCESS_KEY"] == "${STORAGE_APP_ACCESS_KEY}"
+    assert environment["APP_STORAGE__SECRET_KEY"] == "${STORAGE_APP_SECRET_KEY}"
+
+
+def test_app_policy_allows_only_object_access_in_the_bucket() -> None:
+    policy = json.loads((STORAGE_INIT_DIR / "app-policy.json").read_text(encoding="utf-8"))
+    grants = {
+        (action, resource)
+        for statement in policy["Statement"]
+        if statement["Effect"] == "Allow"
+        for action in statement["Action"]
+        for resource in statement["Resource"]
+    }
+
+    assert {statement["Effect"] for statement in policy["Statement"]} == {"Allow"}
+    assert {action for action, _ in grants} == APP_POLICY_ACTIONS
+    assert grants == {("s3:ListBucket", "arn:aws:s3:::__BUCKET__")} | {
+        (action, "arn:aws:s3:::__BUCKET__/*") for action in APP_POLICY_ACTIONS - {"s3:ListBucket"}
+    }
+
+
+def test_storage_init_runs_the_setup_script_from_a_read_only_mount() -> None:
+    init = services()["storage-init"]
+
+    assert init["image"] == services()["storage"]["image"]
+    assert init["volumes"] == ["./infra/storage:/init:ro"]
+    assert init["entrypoint"] == ["sh", "/init/init.sh"]
+    assert "set -eu" in (STORAGE_INIT_DIR / "init.sh").read_text(encoding="utf-8")
+
+
+def test_storage_init_keeps_the_root_login_off_disk() -> None:
+    init = services()["storage-init"]
+
+    assert init["environment"]["HOME"] == IN_CONTAINER_TMP
+    assert IN_CONTAINER_TMP in init["tmpfs"]
 
 
 @pytest.mark.parametrize("name", ["api", "worker"])
