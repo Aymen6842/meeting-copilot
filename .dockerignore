@@ -1,0 +1,23 @@
+# Keep the build context small and free of secrets and local state.
+.git
+**/.venv
+**/node_modules
+**/.next
+**/__pycache__
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+
+.env
+.env.*
+!.env.example
+
+data
+models
+eval/datasets
+**/*.wav
+**/*.mp3
+**/*.m4a
+**/*.mp4
+**/*.webm
+**/*.flac

@@ -18,7 +18,7 @@ silently diverge.
 
 - Backend: Python 3.12, FastAPI, SQLAlchemy 2.0 (async), Alembic, Pydantic v2, pydantic-settings
 - Worker: arq (Redis-backed job queue), faster-whisper, pyannote
-- Storage: Postgres, Redis, MinIO (S3-compatible)
+- Storage: Postgres, Redis, RustFS (S3-compatible; see ADR-0006)
 - Frontend: Next.js (App Router), TypeScript strict, typed API client generated from OpenAPI
 - Tooling: uv, Ruff, mypy (strict), pytest, Hypothesis, Testcontainers, pnpm, ESLint, Vitest, Playwright
 - Everything runs with `docker compose up`
@@ -71,7 +71,7 @@ docs/                        architecture.md, decisions/ (ADRs)
 - Every change ships with tests. A bug fix starts with a failing test that reproduces it.
 - Unit tests for logic, property tests (Hypothesis) for invariants such as "timestamps never go
   backwards" and "no word lost across chunks".
-- Integration tests use Testcontainers (Postgres, Redis, MinIO). Do not mock the database.
+- Integration tests use Testcontainers (Postgres, Redis, RustFS). Do not mock the database.
 - CI has no GPU: use the `fake` provider or the tiny CPU model (`APP_PROFILE=ci`).
 - Security: the route-enumeration test must pass; every new route requires auth unless it is
   explicitly listed as public.

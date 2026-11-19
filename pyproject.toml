@@ -61,6 +61,7 @@ exclude = ["*.md"]
 # ---------------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.12"
+files = ["apps", "packages", "tests"]
 strict = true
 warn_unreachable = true
 enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
@@ -70,15 +71,29 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 minversion = "8.0"
-testpaths = ["apps/api/tests", "apps/worker/tests", "packages/contracts/tests"]
-addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+testpaths = ["apps/api/tests", "apps/worker/tests", "packages/contracts/tests", "tests"]
+pythonpath = ["."]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+    "-m",
+    "not stack",
+]
+markers = [
+    "stack: needs the running docker compose stack; run with `pytest -m stack`",
+]
 xfail_strict = true
 filterwarnings = ["error"]
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "mypy>=2.4.1",
     "pre-commit>=4.7.0",
     "pytest>=9.2.0",
+    "pyyaml>=6.0.3",
     "ruff>=0.17.6",
+    "types-pyyaml>=6.0.12.20261113",
 ]

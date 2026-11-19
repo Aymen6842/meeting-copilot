@@ -1,0 +1,110 @@
+"""Checks against the running compose stack. Opt-in: `uv run pytest -m stack`.
+
+Start the stack first with `docker compose up -d --build`.
+"""
+
+import json
+import subprocess
+import urllib.error
+import urllib.request
+import uuid
+
+import pytest
+
+from tests.stack.compose_files import (
+    ENV_EXAMPLE_FILE,
+    REPO_ROOT,
+    is_one_shot,
+    read_env_file,
+    services,
+)
+
+pytestmark = pytest.mark.stack
+
+STORAGE_URL = "http://127.0.0.1:9000"
+
+
+def compose_status() -> dict[str, dict[str, object]]:
+    result = subprocess.run(
+        ["docker", "compose", "ps", "--all", "--format", "json"],  # noqa: S607 - docker from PATH
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    rows = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+    return {row["Service"]: row for row in rows}
+
+
+def bucket_name() -> str:
+    env_file = REPO_ROOT / ".env"
+    values = read_env_file(env_file if env_file.exists() else ENV_EXAMPLE_FILE)
+    return values["STORAGE_BUCKET"]
+
+
+def anonymous_get(path: str) -> tuple[int, str]:
+    request = urllib.request.Request(f"{STORAGE_URL}{path}")  # noqa: S310 - fixed http URL
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310
+            return response.status, response.read().decode()
+    except urllib.error.HTTPError as error:
+        return error.code, error.read().decode()
+
+
+def test_long_running_services_are_healthy() -> None:
+    status = compose_status()
+
+    for name, service in services().items():
+        if is_one_shot(service):
+            continue
+        assert name in status, f"{name} is not running"
+        assert status[name]["Health"] == "healthy", f"{name}: {status[name]['Status']}"
+
+
+def test_storage_init_finished_successfully() -> None:
+    init = compose_status()["storage-init"]
+
+    assert init["State"] == "exited"
+    assert init["ExitCode"] == 0
+
+
+def test_bucket_exists_for_authenticated_clients() -> None:
+    # Reuses the storage-init service: same AWS CLI image, credentials and bucket name.
+    result = subprocess.run(
+        [  # noqa: S607 - docker from PATH
+            "docker",
+            "compose",
+            "run",
+            "--rm",
+            "--no-deps",
+            "storage-init",
+            'aws --endpoint-url http://storage:9000 s3api head-bucket --bucket "$STORAGE_BUCKET"',
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_bucket_refuses_anonymous_listing() -> None:
+    status_code, body = anonymous_get(f"/{bucket_name()}")
+
+    assert status_code == 403
+    assert "AccessDenied" in body
+
+
+def test_storage_does_not_reveal_which_buckets_exist() -> None:
+    # Anonymous callers get the same answer for a missing bucket as for ours.
+    status_code, body = anonymous_get(f"/no-such-bucket-{uuid.uuid4().hex[:12]}")
+
+    assert status_code == 403
+    assert "AccessDenied" in body
+
+
+def test_objects_refuse_anonymous_reads() -> None:
+    status_code, _ = anonymous_get(f"/{bucket_name()}/any-object.wav")
+
+    assert status_code == 403

@@ -108,7 +108,7 @@ Every piece of text points back to a time span in the original audio. That singl
 
 - Times are stored as integer milliseconds from the start of the meeting, never as floats or wall-clock times.
 - Human corrections never overwrite model output: `corrected_text` sits beside the original, so evaluation can measure both.
-- Postgres holds structured data; audio lives in object storage (MinIO locally, S3-compatible in the cloud).
+- Postgres holds structured data; audio lives in object storage (RustFS locally, any S3-compatible service in the cloud; ADR-0006).
 
 **Ready for live mode** (added now so stage 2 needs no migration)
 
@@ -269,7 +269,7 @@ Two kinds of checks protect the product: software tests prove the code does what
 | Unit | Core logic is correct | Word-to-speaker alignment, chunk-overlap de-duplication, unclear-span rules, config parsing | pytest, Hypothesis | Every push |
 | Property | Invariants always hold | Timestamps never go backwards; no word lost or duplicated across chunks; every review item points to real words | Hypothesis | Every push |
 | Provider contract | Every speech provider behaves the same | One shared test suite run against each provider on a short fixture clip; a fake provider for fast tests | pytest | Every push (fake, CPU); GPU providers on the desktop |
-| Integration | Modules work with real infrastructure | Job lifecycle through Redis; files in MinIO; migrations up and down | pytest + Testcontainers | Every push |
+| Integration | Modules work with real infrastructure | Job lifecycle through Redis; files in object storage (RustFS); migrations up and down | pytest + Testcontainers | Every push |
 | Pipeline end-to-end | A real file becomes a real transcript | 30-second fixture through the real worker with a tiny model on CPU; output compared with a saved snapshot, with tolerance | pytest | Every push |
 | Frontend | Screens behave correctly | Components with Vitest + Testing Library; Playwright: upload → transcript → click a word plays audio → correct a review item | Vitest, Playwright | Every push |
 | Resilience | Failures don't lose work | Kill the worker mid-job; restart Redis; make storage unavailable; expect resume or a clean retry | pytest + Docker | Nightly |
@@ -362,7 +362,7 @@ One monorepo, organised so that a reviewer finds the architecture, the decisions
 │  ├─ architecture.md
 │  └─ decisions/           ADR-0001-modular-monolith.md, ...
 ├─ config/                 default.yaml, profiles/
-├─ docker-compose.yml      api, worker (GPU), web, postgres, redis, minio
+├─ docker-compose.yml      api, worker (GPU), web, postgres, redis, rustfs
 └─ .github/workflows/      lint, type-check, tests, regression eval
 ```
 
@@ -375,6 +375,7 @@ One monorepo, organised so that a reviewer finds the architecture, the decisions
 - ADR-0003: Integer millisecond timestamps and word-level storage
 - ADR-0004: arq as the job queue
 - ADR-0005: Never overwrite model output with human corrections (to write)
+- ADR-0006: RustFS as the local S3-compatible object storage (replaces MinIO)
 
 **Milestones** (in order; no dates, since quality comes first)
 

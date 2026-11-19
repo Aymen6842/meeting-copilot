@@ -29,13 +29,13 @@ pytest config; pnpm for `apps/web`; pre-commit hooks; `.editorconfig`; `.gitigno
 
 ## Task 2: Docker Compose stack
 
-**Build:** `docker-compose.yml` with postgres, redis, minio (plus a one-shot service that creates
+**Build:** `docker-compose.yml` with postgres, redis, rustfs (plus a one-shot service that creates
 a private bucket), api, worker, web. Health checks on every service. `.env.example` with every
 variable the stack needs.
 
 **Done when:**
 - [ ] `docker compose up -d` on a clean clone brings everything to healthy
-- [ ] The MinIO bucket exists and is not publicly readable
+- [ ] The storage bucket exists and is not publicly readable
 - [ ] No secret values are committed
 
 ## Task 3: API skeleton
@@ -43,7 +43,7 @@ variable the stack needs.
 **Build:** FastAPI app factory; settings with pydantic-settings that load `config/default.yaml`
 plus `config/profiles/$APP_PROFILE.yaml` plus environment variables; structured JSON logging;
 a single error-handling layer mapping domain exceptions to HTTP; `GET /health` checking
-Postgres, Redis and MinIO.
+Postgres, Redis and RustFS.
 
 **Done when:**
 - [ ] `/health` reports each dependency's status
@@ -79,7 +79,7 @@ download (GET) URLs with short expiry, check that an object exists, read its siz
 Object keys are namespaced by workspace: `workspaces/{workspace_id}/meetings/{meeting_id}/original.<ext>`.
 
 **Done when:**
-- [ ] Integration tests against a MinIO container: upload via pre-signed URL, verify, delete
+- [ ] Integration tests against a RustFS container: upload via pre-signed URL, verify, delete
 - [ ] An expired URL is rejected (test with a very short expiry)
 
 ## Task 7: Meetings module
