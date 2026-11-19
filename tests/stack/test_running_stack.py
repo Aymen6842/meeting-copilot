@@ -36,10 +36,33 @@ def compose_status() -> dict[str, dict[str, object]]:
     return {row["Service"]: row for row in rows}
 
 
-def bucket_name() -> str:
+def env_value(name: str) -> str:
     env_file = REPO_ROOT / ".env"
-    values = read_env_file(env_file if env_file.exists() else ENV_EXAMPLE_FILE)
-    return values["STORAGE_BUCKET"]
+    return read_env_file(env_file if env_file.exists() else ENV_EXAMPLE_FILE)[name]
+
+
+def bucket_name() -> str:
+    return env_value("STORAGE_BUCKET")
+
+
+def upload_preflight_allowed_origin(origin: str) -> str | None:
+    """Origin the storage allows for a browser PUT from `origin`, or None if refused."""
+    request = urllib.request.Request(  # noqa: S310 - fixed http URL
+        f"{STORAGE_URL}/{bucket_name()}/upload.wav",
+        method="OPTIONS",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "PUT",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+    allowed_origin: str | None
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:  # noqa: S310
+            allowed_origin = response.headers.get("Access-Control-Allow-Origin")
+    except urllib.error.HTTPError as error:
+        allowed_origin = error.headers.get("Access-Control-Allow-Origin")
+    return allowed_origin
 
 
 def anonymous_get(path: str) -> tuple[int, str]:
@@ -102,6 +125,16 @@ def test_storage_does_not_reveal_which_buckets_exist() -> None:
 
     assert status_code == 403
     assert "AccessDenied" in body
+
+
+def test_storage_allows_browser_uploads_from_the_frontend() -> None:
+    web_origin = env_value("WEB_ORIGIN")
+
+    assert upload_preflight_allowed_origin(web_origin) == web_origin
+
+
+def test_storage_refuses_browser_uploads_from_other_origins() -> None:
+    assert upload_preflight_allowed_origin("https://unknown-site.example") is None
 
 
 def test_objects_refuse_anonymous_reads() -> None:

@@ -26,7 +26,9 @@ service can be used instead; the code does not change.
   vendor SDK or admin API.
 - A one-shot `storage-init` service creates the bucket with the AWS CLI. Buckets are private by
   default and no policy grants anonymous access.
-- The web console's cross-origin setting is restricted to the local frontend.
+- Cross-origin access is restricted: the S3 API allows only the web frontend's origin (needed for
+  browser uploads through pre-signed URLs), and the web console allows only its own origin. The
+  image's default for the console is `*`.
 
 Verified before deciding (RustFS 1.0.6): health endpoints return 200, a new bucket has no
 policy, anonymous list and get return 403, a pre-signed GET works while valid and returns 403

@@ -70,7 +70,7 @@ enable_error_code = ["ignore-without-code", "redundant-expr", "truthy-bool"]
 # pytest
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
-minversion = "8.0"
+minversion = "9.0"
 testpaths = ["apps/api/tests", "apps/worker/tests", "packages/contracts/tests", "tests"]
 pythonpath = ["."]
 addopts = [
