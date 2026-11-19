@@ -1,0 +1,30 @@
+# Base configuration. A profile (config/profiles/$APP_PROFILE.yaml) overrides it, and
+# environment variables (APP_ prefix, "__" for nesting, e.g. APP_TRANSCRIPTION__MODEL)
+# override both. Secrets (database, Redis, storage credentials) come only from the environment.
+
+transcription:
+  provider: local          # local | hosted | fake | cached
+  model: large-v3-turbo
+  compute_type: int8       # float16 | int8 | int8_float16 | float32
+  device: cuda             # cuda | cpu
+  language_hint: auto      # auto | en | fr | ar-tn | mixed
+
+diarization:
+  enabled: true
+  min_speakers: null
+  max_speakers: null
+
+uncertainty:
+  word_threshold: 0.45
+  segment_threshold: 0.6
+
+worker:
+  gpu_concurrency: 1
+  chunk_seconds: 600
+  max_attempts: 3
+
+logging:
+  level: INFO              # DEBUG | INFO | WARNING | ERROR
+
+health:
+  check_timeout_ms: 2000   # per dependency checked by GET /health

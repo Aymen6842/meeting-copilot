@@ -1,0 +1,12 @@
+# GitHub Actions: no GPU. Deterministic fake provider; tests never wait on a model.
+transcription:
+  provider: fake
+  model: tiny
+  compute_type: int8
+  device: cpu
+diarization:
+  enabled: false
+worker:
+  chunk_seconds: 60
+logging:
+  level: WARNING

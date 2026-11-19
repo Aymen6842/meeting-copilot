@@ -1,0 +1,7 @@
+# RTX 3060 Ti, 8 GB. Benchmarks, published numbers and the demo.
+transcription:
+  model: large-v3-turbo
+  compute_type: int8_float16
+  device: cuda
+diarization:
+  enabled: true

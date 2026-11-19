@@ -83,17 +83,25 @@ addopts = [
 ]
 markers = [
     "stack: needs the running docker compose stack; run with `pytest -m stack`",
+    "integration: starts real containers with Testcontainers (needs Docker)",
 ]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
 xfail_strict = true
 filterwarnings = ["error"]
 
 [dependency-groups]
 dev = [
+    "asyncpg-stubs>=0.32.0",
+    "boto3-stubs[s3]>=1.44.6",
     "httpx>=0.28.1",
     "mypy>=2.4.1",
     "pre-commit>=4.7.0",
     "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
     "pyyaml>=6.0.3",
     "ruff>=0.17.6",
+    "testcontainers>=4.15.0",
     "types-pyyaml>=6.0.12.20261113",
 ]

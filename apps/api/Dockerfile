@@ -19,6 +19,7 @@ COPY apps/worker/pyproject.toml apps/worker/pyproject.toml
 COPY packages/contracts/pyproject.toml packages/contracts/pyproject.toml
 RUN uv sync --frozen --no-dev --package meeting-copilot-api --no-install-workspace
 
+COPY config config
 COPY apps/api apps/api
 RUN uv sync --frozen --no-dev --package meeting-copilot-api
 
@@ -26,4 +27,5 @@ RUN useradd --system --no-create-home app
 USER app
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# --no-access-log: the app logs each request itself, as JSON with a request id.
+CMD ["uvicorn", "--factory", "app.main:create_app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

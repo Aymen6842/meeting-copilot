@@ -4,7 +4,12 @@ version = "0.0.0"
 description = "HTTP API: the modular monolith (meetings, transcripts, review, jobs, auth)."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "asyncpg>=0.32.0",
+    "boto3>=1.44.6",
     "fastapi>=0.165.0",
+    "pydantic-settings>=2.16.3",
+    "pyyaml>=6.0.3",
+    "redis>=8.1.0",
     "uvicorn>=0.54.0",
 ]
 

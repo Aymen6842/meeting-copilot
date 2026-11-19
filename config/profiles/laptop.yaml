@@ -1,0 +1,10 @@
+# GTX 1050, 3 GB (Pascal). Needs the pinned CUDA 12.6 PyTorch build.
+# Transcripts are less accurate here: never publish benchmark numbers from this profile.
+transcription:
+  model: medium
+  compute_type: int8
+  device: cuda             # switch to cpu if the GPU path fails
+diarization:
+  enabled: true
+worker:
+  chunk_seconds: 300
