@@ -17,7 +17,7 @@ from sqlalchemy.pool import NullPool
 from app.model_registry import all_models_metadata
 from tests.fixtures.containers import alembic_config, downgrade, migrate
 
-APP_TABLES = {"workspaces", "users", "memberships"}
+APP_TABLES = {"workspaces", "users", "memberships", "sessions"}
 
 # Every relation (table, index, sequence, view) and user-defined type in the public schema,
 # except Alembic's own bookkeeping table and its primary key.

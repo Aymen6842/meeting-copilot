@@ -3,16 +3,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response, status
 
-from app.core.config import Settings
+from app.core.dependencies import AppSettings
 from app.health.schemas import HealthResponse
 from app.health.service import DependencyCheck, check_health
 
 router = APIRouter(tags=["health"])
-
-
-def get_settings(request: Request) -> Settings:
-    settings: Settings = request.app.state.settings
-    return settings
 
 
 def get_dependency_checks(request: Request) -> Mapping[str, DependencyCheck]:
@@ -28,7 +23,7 @@ def get_dependency_checks(request: Request) -> Mapping[str, DependencyCheck]:
 )
 async def health(
     response: Response,
-    settings: Annotated[Settings, Depends(get_settings)],
+    settings: AppSettings,
     checks: Annotated[Mapping[str, DependencyCheck], Depends(get_dependency_checks)],
 ) -> HealthResponse:
     report = await check_health(checks, settings.health.check_timeout_ms)

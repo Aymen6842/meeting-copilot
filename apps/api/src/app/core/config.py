@@ -65,6 +65,20 @@ class HealthSettings(SettingsSection):
     check_timeout_ms: PositiveInt
 
 
+class RateLimit(SettingsSection):
+    attempts: PositiveInt
+    window_seconds: PositiveInt
+
+
+class AuthSettings(SettingsSection):
+    session_ttl_hours: PositiveInt
+    cookie_name: Annotated[str, Field(pattern=r"^[A-Za-z0-9_-]+$")]
+    cookie_secure: bool
+    login_limit_per_email: RateLimit
+    login_limit_per_ip: RateLimit
+    register_limit_per_ip: RateLimit
+
+
 class DatabaseSettings(SettingsSection):
     pool_size: PositiveInt
     max_overflow: Annotated[int, Field(ge=0)]
@@ -92,6 +106,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings
     redis_url: SecretStr
     storage: StorageSettings
+    auth: AuthSettings
     transcription: TranscriptionSettings
     diarization: DiarizationSettings
     uncertainty: UncertaintySettings

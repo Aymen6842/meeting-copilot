@@ -28,8 +28,11 @@ async def add_workspace(session: AsyncSession, name: str = "Ada's workspace") ->
     return workspace
 
 
-async def membership_count(session: AsyncSession) -> int:
-    count = await session.scalar(select(func.count()).select_from(Membership))
+async def membership_count(session: AsyncSession, user_id: uuid.UUID) -> int:
+    """Other tests commit rows to the shared database, so count only this user's."""
+    count = await session.scalar(
+        select(func.count()).select_from(Membership).where(Membership.user_id == user_id)
+    )
     return count or 0
 
 
@@ -90,7 +93,7 @@ async def test_deleting_a_workspace_deletes_its_memberships(db_session: AsyncSes
 
     await db_session.execute(delete(Workspace).where(Workspace.id == workspace.id))
 
-    assert await membership_count(db_session) == 0
+    assert await membership_count(db_session, user.id) == 0
     assert await db_session.get(User, user.id) is not None
 
 
@@ -102,4 +105,4 @@ async def test_deleting_a_user_deletes_their_memberships(db_session: AsyncSessio
 
     await db_session.execute(delete(User).where(User.id == user.id))
 
-    assert await membership_count(db_session) == 0
+    assert await membership_count(db_session, user.id) == 0

@@ -58,3 +58,26 @@ class Membership(Base):
     )
     role: Mapped[Role] = mapped_column(String(20))
     created_at: Mapped[datetime.datetime] = created_at_column()
+
+
+TOKEN_HASH_LENGTH = 64  # hex SHA-256
+
+
+class AuthSession(Base):
+    """A login. The cookie holds a random token; only its SHA-256 hash is stored here, so a
+    copy of the database contains no usable tokens. Logout deletes the row."""
+
+    __tablename__ = "sessions"
+    __table_args__ = (CheckConstraint("expires_at > created_at", name="expires_after_creation"),)
+
+    id: Mapped[uuid.UUID] = uuid_primary_key()
+    token_hash: Mapped[str] = mapped_column(String(TOKEN_HASH_LENGTH), unique=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # The workspace this session acts in; checked against memberships on every request.
+    workspace_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("workspaces.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime.datetime] = created_at_column()
+    expires_at: Mapped[datetime.datetime]

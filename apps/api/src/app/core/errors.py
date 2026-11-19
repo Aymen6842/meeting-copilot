@@ -29,3 +29,23 @@ class PermissionDeniedError(DomainError):
 
 class DomainValidationError(DomainError):
     code = "validation_failed"
+
+
+class AuthenticationError(DomainError):
+    """No valid session. Every cause (missing, malformed, expired) gets the same message."""
+
+    code = "not_authenticated"
+
+
+class InvalidCredentialsError(AuthenticationError):
+    """Wrong email or password. Never says which."""
+
+    code = "invalid_credentials"
+
+
+class RateLimitExceededError(DomainError):
+    code = "too_many_requests"
+
+    def __init__(self, message: str, retry_after_seconds: int) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds

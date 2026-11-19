@@ -1,37 +1,30 @@
 from pathlib import Path
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
-from app.core.config import PROFILES, ConfigurationError, load_settings, merge_dicts
+from app.core.config import (
+    PROFILES,
+    ConfigurationError,
+    load_settings,
+    merge_dicts,
+    read_yaml_mapping,
+)
 
 CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
-DEFAULT_YAML = """
-database:
-  pool_size: 5
-  max_overflow: 5
-  pool_timeout_seconds: 10
-transcription:
-  provider: local
-  model: default-model
-  compute_type: int8
-  device: cuda
-  language_hint: auto
-diarization:
-  enabled: true
-uncertainty:
-  word_threshold: 0.45
-  segment_threshold: 0.6
-worker:
-  gpu_concurrency: 1
-  chunk_seconds: 600
-  max_attempts: 3
-logging:
-  level: INFO
-health:
-  check_timeout_ms: 2000
-"""
+# The real default.yaml with known values for the keys these tests check, so new settings
+# sections never need to be copied in here.
+DEFAULT_OVERRIDES = {
+    "transcription": {
+        "provider": "local",
+        "model": "default-model",
+        "compute_type": "int8",
+        "device": "cuda",
+    },
+    "worker": {"chunk_seconds": 600},
+}
 
 PROFILE_YAML = """
 transcription:
@@ -42,8 +35,9 @@ transcription:
 
 @pytest.fixture
 def config_dir(tmp_path: Path) -> Path:
+    default = merge_dicts(read_yaml_mapping(CONFIG_DIR / "default.yaml"), DEFAULT_OVERRIDES)
     (tmp_path / "profiles").mkdir()
-    (tmp_path / "default.yaml").write_text(DEFAULT_YAML, encoding="utf-8")
+    (tmp_path / "default.yaml").write_text(yaml.safe_dump(default), encoding="utf-8")
     (tmp_path / "profiles" / "ci.yaml").write_text(PROFILE_YAML, encoding="utf-8")
     return tmp_path
 

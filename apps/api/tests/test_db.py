@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager
 from typing import Annotated
@@ -14,6 +15,7 @@ from app.core.db import create_engine, create_session_factory, get_session
 
 ClientFactory = Callable[[FastAPI], AbstractAsyncContextManager[httpx.AsyncClient]]
 Session = Annotated[AsyncSession, Depends(get_session)]
+UNCOMMITTED_NAME = f"never committed {uuid.uuid4()}"
 
 
 def test_engine_uses_the_configured_pool(settings: Settings) -> None:
@@ -43,7 +45,7 @@ def session_app(engine: AsyncEngine) -> FastAPI:
 
     @app.post("/workspaces-without-commit")
     async def add_without_commit(session: Session) -> dict[str, str]:
-        session.add(Workspace(name="Never committed"))
+        session.add(Workspace(name=UNCOMMITTED_NAME))
         await session.flush()
         return {"status": "flushed"}
 
@@ -68,7 +70,9 @@ async def test_uncommitted_work_is_rolled_back_when_the_request_ends(
         response = await client.post("/workspaces-without-commit")
 
     async with create_session_factory(engine)() as session:
-        count = await session.scalar(select(func.count()).select_from(Workspace))
+        count = await session.scalar(  # other tests commit workspaces; count only ours
+            select(func.count()).select_from(Workspace).where(Workspace.name == UNCOMMITTED_NAME)
+        )
     assert response.json() == {"status": "flushed"}
     assert count == 0
 

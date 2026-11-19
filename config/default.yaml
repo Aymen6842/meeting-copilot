@@ -7,8 +7,22 @@ database:
   max_overflow: 5
   pool_timeout_seconds: 10 # wait this long for a free connection before failing
 
+auth:
+  session_ttl_hours: 168     # 7 days; the session is deleted at logout
+  cookie_name: session
+  cookie_secure: true        # browsers still accept Secure cookies on http://localhost
+  login_limit_per_email:     # every attempt counts, successful or not
+    attempts: 10
+    window_seconds: 900
+  login_limit_per_ip:
+    attempts: 30
+    window_seconds: 900
+  register_limit_per_ip:
+    attempts: 10
+    window_seconds: 3600
+
 transcription:
-  provider: local         # local | hosted | fake | cached
+  provider: local        # local | hosted | fake | cached
   model: large-v3-turbo
   compute_type: int8       # float16 | int8 | int8_float16 | float32
   device: cuda             # cuda | cpu

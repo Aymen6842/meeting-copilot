@@ -13,11 +13,13 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
 from app.core.errors import (
+    AuthenticationError,
     ConflictError,
     DomainError,
     DomainValidationError,
     NotFoundError,
     PermissionDeniedError,
+    RateLimitExceededError,
 )
 
 STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
@@ -25,6 +27,8 @@ STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
     ConflictError: HTTPStatus.CONFLICT,
     PermissionDeniedError: HTTPStatus.FORBIDDEN,
     DomainValidationError: HTTPStatus.UNPROCESSABLE_ENTITY,
+    AuthenticationError: HTTPStatus.UNAUTHORIZED,
+    RateLimitExceededError: HTTPStatus.TOO_MANY_REQUESTS,
 }
 
 # Fields of a validation error that are safe to return: never "input" (it may be a password)
@@ -72,7 +76,10 @@ def safe_validation_issues(
 
 
 async def handle_domain_error(request: Request, error: DomainError) -> JSONResponse:
-    return error_response(status_for(error), error.code, error.message)
+    response = error_response(status_for(error), error.code, error.message)
+    if isinstance(error, RateLimitExceededError):
+        response.headers["Retry-After"] = str(error.retry_after_seconds)
+    return response
 
 
 async def handle_request_validation_error(

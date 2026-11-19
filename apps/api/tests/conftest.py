@@ -7,9 +7,12 @@ from pathlib import Path
 
 import httpx
 import pytest
+import redis.asyncio
 from fastapi import FastAPI
 
 from app.core.config import Settings, load_settings
+from app.main import create_app
+from tests.fixtures.containers import Storage
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CONFIG_DIR = REPO_ROOT / "config"
@@ -70,9 +73,11 @@ def settings(app_environment: pytest.MonkeyPatch) -> Settings:
 
 @asynccontextmanager
 async def client_for(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
-    """HTTP client calling the app in-process. Server errors become 500 responses."""
+    """HTTP client calling the app in-process. Server errors become 500 responses.
+
+    https, so the client sends back the session cookie, which is marked Secure."""
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="https://test") as client:
         yield client
 
 
@@ -92,3 +97,51 @@ def make_client() -> ClientFactory:
 @pytest.fixture
 def parse_log_lines() -> LogParser:
     return json_log_lines
+
+
+@pytest.fixture
+def integration_environment(
+    app_environment: pytest.MonkeyPatch,
+    migrated_database_url: str,
+    redis_url: str,
+    storage_container: Storage,
+) -> pytest.MonkeyPatch:
+    """The app's environment pointed at the shared test containers."""
+    app_environment.setenv("APP_DATABASE_URL", migrated_database_url)
+    app_environment.setenv("APP_REDIS_URL", redis_url)
+    app_environment.setenv("APP_STORAGE__ENDPOINT_URL", storage_container.endpoint_url)
+    app_environment.setenv("APP_STORAGE__ACCESS_KEY", storage_container.access_key)
+    app_environment.setenv("APP_STORAGE__SECRET_KEY", storage_container.secret_key)
+    app_environment.setenv("APP_STORAGE__BUCKET", storage_container.bucket)
+    return app_environment
+
+
+@asynccontextmanager
+async def live_client(redis_url: str) -> AsyncIterator[httpx.AsyncClient]:
+    """The full app (lifespan included) built from the current environment.
+
+    Redis is flushed first so rate-limit counters never leak between tests. Database rows
+    persist across tests: use unique emails."""
+    flush_client = redis.asyncio.Redis.from_url(redis_url)
+    await flush_client.flushdb()
+    await flush_client.aclose()
+    app = create_app()
+    async with app.router.lifespan_context(app), client_for(app) as client:
+        yield client
+
+
+ApiClientFactory = Callable[[], AbstractAsyncContextManager[httpx.AsyncClient]]
+
+
+@pytest.fixture
+def make_api_client(
+    integration_environment: pytest.MonkeyPatch, redis_url: str
+) -> ApiClientFactory:
+    """For tests that set APP_* overrides first, then build the app."""
+    return lambda: live_client(redis_url)
+
+
+@pytest.fixture
+async def api_client(make_api_client: ApiClientFactory) -> AsyncIterator[httpx.AsyncClient]:
+    async with make_api_client() as client:
+        yield client
