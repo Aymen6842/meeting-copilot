@@ -10,6 +10,8 @@ import urllib.request
 import uuid
 
 import pytest
+from alembic.config import Config as AlembicConfig
+from alembic.script import ScriptDirectory
 
 from tests.stack.compose_files import (
     ENV_EXAMPLE_FILE,
@@ -22,6 +24,7 @@ from tests.stack.compose_files import (
 pytestmark = pytest.mark.stack
 
 STORAGE_URL = "http://127.0.0.1:9000"
+ALEMBIC_INI = REPO_ROOT / "apps" / "api" / "alembic.ini"
 
 
 def compose_status() -> dict[str, dict[str, object]]:
@@ -141,3 +144,33 @@ def test_objects_refuse_anonymous_reads() -> None:
     status_code, _ = anonymous_get(f"/{bucket_name()}/any-object.wav")
 
     assert status_code == 403
+
+
+def test_migrate_finished_successfully() -> None:
+    migrate = compose_status()["migrate"]
+
+    assert migrate["State"] == "exited"
+    assert migrate["ExitCode"] == 0
+
+
+def test_database_is_at_the_latest_migration() -> None:
+    script = ScriptDirectory.from_config(AlembicConfig(str(ALEMBIC_INI)))
+    result = subprocess.run(
+        [  # noqa: S607 - docker from PATH
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            "postgres",
+            "sh",
+            "-c",
+            'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tA'
+            ' -c "SELECT version_num FROM alembic_version"',
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    assert result.stdout.strip() == script.get_current_head()

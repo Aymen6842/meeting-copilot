@@ -4,7 +4,7 @@ name: meeting-copilot
 
 x-app-environment: &app-environment
   APP_PROFILE: ${APP_PROFILE:?set APP_PROFILE in .env}
-  APP_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+  APP_DATABASE_URL: &database-url postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
   APP_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
   APP_STORAGE__ENDPOINT_URL: http://storage:9000
   APP_STORAGE__ACCESS_KEY: ${STORAGE_ROOT_USER}
@@ -90,14 +90,27 @@ services:
         && echo "bucket $$STORAGE_BUCKET is ready"
     restart: "no"
 
+  # One-shot: applies database migrations, then exits. api and worker start only after it.
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    command: ["alembic", "-c", "apps/api/alembic.ini", "upgrade", "head"]
+    environment:
+      APP_DATABASE_URL: *database-url # only the database URL, none of the other secrets
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
     environment: *app-environment
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       storage-init:
@@ -122,8 +135,8 @@ services:
       dockerfile: apps/worker/Dockerfile
     environment: *app-environment
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       storage-init:

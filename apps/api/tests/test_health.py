@@ -10,7 +10,7 @@ from fastapi import FastAPI
 
 from app.core.config import Settings, load_settings
 from app.health.routes import get_dependency_checks
-from app.health.service import DependencyCheck, check_health
+from app.health.service import DependencyCheck, check_health, root_cause
 from app.main import create_app
 
 CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
@@ -95,3 +95,29 @@ async def test_checks_run_concurrently() -> None:
 
     assert report.status == "ok"
     assert elapsed < 0.5  # sequential would take at least 0.6 s
+
+
+def test_root_cause_unwraps_explicitly_chained_errors() -> None:
+    driver_error = ConnectionRefusedError("driver error")
+    wrapper = RuntimeError("wrapper")
+    wrapper.__cause__ = driver_error
+
+    assert root_cause(wrapper) is driver_error
+
+
+def test_root_cause_of_an_unchained_error_is_itself() -> None:
+    error = ValueError("plain")
+
+    assert root_cause(error) is error
+
+
+async def test_wrapped_failure_is_reported_by_its_root_cause_type() -> None:
+    async def wrapped_refusal() -> None:
+        try:
+            raise ConnectionRefusedError("could not connect")
+        except ConnectionRefusedError as driver_error:
+            raise RuntimeError("wrapped by a library") from driver_error
+
+    report = await check_health({"postgres": wrapped_refusal}, timeout_ms=1000)
+
+    assert report.checks["postgres"].error == "ConnectionRefusedError"

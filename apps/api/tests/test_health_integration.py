@@ -1,99 +1,34 @@
-"""GET /health against real Postgres, Redis and RustFS containers (Testcontainers).
+"""GET /health against real Postgres, Redis and RustFS (shared session containers)."""
 
-Images come from docker-compose.yml so tests and the stack always run the same versions.
-"""
-
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
-from pathlib import Path
-from typing import Any
 
-import boto3
 import httpx
 import pytest
-import yaml
 from fastapi import FastAPI
 from testcontainers.community.postgres import PostgresContainer
-from testcontainers.community.redis import RedisContainer
-from testcontainers.core.container import DockerContainer
-from testcontainers.core.wait_strategies import HttpWaitStrategy
 
 from app.main import create_app
+from tests.fixtures.containers import Storage
 
 pytestmark = pytest.mark.integration
 
 ClientFactory = Callable[[FastAPI], AbstractAsyncContextManager[httpx.AsyncClient]]
 
-COMPOSE_FILE = Path(__file__).resolve().parents[3] / "docker-compose.yml"
-STORAGE_ACCESS_KEY = "integration-access-key"
-STORAGE_SECRET_KEY = "integration-secret-key"  # noqa: S105 - throwaway container credential
-BUCKET = "integration-bucket"
-
-
-def compose_image(service: str) -> str:
-    compose: dict[str, Any] = yaml.safe_load(COMPOSE_FILE.read_text(encoding="utf-8"))  # Any: YAML
-    image: str = compose["services"][service]["image"]
-    return image
-
-
-@pytest.fixture(scope="module")
-def postgres() -> Iterator[PostgresContainer]:
-    with PostgresContainer(compose_image("postgres"), driver=None) as container:
-        yield container
-
-
-@pytest.fixture(scope="module")
-def redis_container() -> Iterator[RedisContainer]:
-    with RedisContainer(compose_image("redis")) as container:
-        yield container
-
-
-@pytest.fixture(scope="module")
-def storage() -> Iterator[DockerContainer]:
-    container = (
-        DockerContainer(compose_image("storage"))
-        .with_env("RUSTFS_ACCESS_KEY", STORAGE_ACCESS_KEY)
-        .with_env("RUSTFS_SECRET_KEY", STORAGE_SECRET_KEY)
-        .with_exposed_ports(9000)
-        .waiting_for(HttpWaitStrategy(9000, "/health/ready").for_status_code(200))
-    )
-    with container:
-        yield container
-
-
-def storage_url(storage: DockerContainer) -> str:
-    return f"http://{storage.get_container_host_ip()}:{storage.get_exposed_port(9000)}"
-
-
-@pytest.fixture(scope="module")
-def bucket(storage: DockerContainer) -> str:
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=storage_url(storage),
-        region_name="us-east-1",
-        aws_access_key_id=STORAGE_ACCESS_KEY,
-        aws_secret_access_key=STORAGE_SECRET_KEY,
-    )
-    s3.create_bucket(Bucket=BUCKET)
-    return BUCKET
-
 
 @pytest.fixture
 def real_environment(
     app_environment: pytest.MonkeyPatch,
-    postgres: PostgresContainer,
-    redis_container: RedisContainer,
-    storage: DockerContainer,
-    bucket: str,
+    postgres_url: str,
+    redis_url: str,
+    storage_container: Storage,
 ) -> pytest.MonkeyPatch:
-    redis_host = redis_container.get_container_host_ip()
-    redis_port = redis_container.get_exposed_port(6379)
-    app_environment.setenv("APP_DATABASE_URL", postgres.get_connection_url(driver="asyncpg"))
-    app_environment.setenv("APP_REDIS_URL", f"redis://{redis_host}:{redis_port}/0")
-    app_environment.setenv("APP_STORAGE__ENDPOINT_URL", storage_url(storage))
-    app_environment.setenv("APP_STORAGE__ACCESS_KEY", STORAGE_ACCESS_KEY)
-    app_environment.setenv("APP_STORAGE__SECRET_KEY", STORAGE_SECRET_KEY)
-    app_environment.setenv("APP_STORAGE__BUCKET", bucket)
+    app_environment.setenv("APP_DATABASE_URL", postgres_url)
+    app_environment.setenv("APP_REDIS_URL", redis_url)
+    app_environment.setenv("APP_STORAGE__ENDPOINT_URL", storage_container.endpoint_url)
+    app_environment.setenv("APP_STORAGE__ACCESS_KEY", storage_container.access_key)
+    app_environment.setenv("APP_STORAGE__SECRET_KEY", storage_container.secret_key)
+    app_environment.setenv("APP_STORAGE__BUCKET", storage_container.bucket)
     return app_environment
 
 
@@ -131,12 +66,11 @@ async def test_health_reports_a_missing_bucket(
 
 async def test_health_reports_wrong_database_credentials(
     real_environment: pytest.MonkeyPatch,
-    postgres: PostgresContainer,
+    postgres_container: PostgresContainer,
+    postgres_url: str,
     make_client: ClientFactory,
 ) -> None:
-    wrong_url = postgres.get_connection_url(driver="asyncpg").replace(
-        f":{postgres.password}@", ":wrong-password@"
-    )
+    wrong_url = postgres_url.replace(f":{postgres_container.password}@", ":wrong-password@")
     real_environment.setenv("APP_DATABASE_URL", wrong_url)
 
     response = await get_health(create_app(), make_client)

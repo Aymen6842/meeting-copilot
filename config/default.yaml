@@ -2,8 +2,13 @@
 # environment variables (APP_ prefix, "__" for nesting, e.g. APP_TRANSCRIPTION__MODEL)
 # override both. Secrets (database, Redis, storage credentials) come only from the environment.
 
+database:
+  pool_size: 5
+  max_overflow: 5
+  pool_timeout_seconds: 10 # wait this long for a free connection before failing
+
 transcription:
-  provider: local          # local | hosted | fake | cached
+  provider: local         # local | hosted | fake | cached
   model: large-v3-turbo
   compute_type: int8       # float16 | int8 | int8_float16 | float32
   device: cuda             # cuda | cpu

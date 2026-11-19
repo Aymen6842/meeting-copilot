@@ -8,6 +8,10 @@ from app.core.config import PROFILES, ConfigurationError, load_settings, merge_d
 CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 
 DEFAULT_YAML = """
+database:
+  pool_size: 5
+  max_overflow: 5
+  pool_timeout_seconds: 10
 transcription:
   provider: local
   model: default-model

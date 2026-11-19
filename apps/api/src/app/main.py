@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from app.core.clients import create_redis_client, create_s3_client
 from app.core.config import Settings, load_settings
+from app.core.db import create_engine, create_session_factory
 from app.core.error_handlers import register_error_handlers
 from app.core.logging import add_request_logging, configure_logging
 from app.health.routes import router as health_router
@@ -28,11 +29,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings: Settings = app.state.settings
+    engine = create_engine(settings)
     redis_client = create_redis_client(settings)
     s3_client = create_s3_client(settings)
-    app.state.dependency_checks = build_dependency_checks(settings, redis_client, s3_client)
+    app.state.session_factory = create_session_factory(engine)
+    app.state.dependency_checks = build_dependency_checks(settings, engine, redis_client, s3_client)
     try:
         yield
     finally:
         await redis_client.aclose()
         s3_client.close()
+        await engine.dispose()

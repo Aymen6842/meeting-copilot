@@ -1,6 +1,6 @@
 """Factories for clients to shared infrastructure, created once per process in the lifespan.
 
-Task 4 adds the database engine; task 6 wraps the S3 client in `core/storage.py`.
+The database engine lives in `core/db.py`; task 6 wraps the S3 client in `core/storage.py`.
 """
 
 from typing import TYPE_CHECKING
@@ -42,8 +42,3 @@ def create_s3_client(settings: Settings) -> "S3Client":
             retries={"max_attempts": 1, "mode": "standard"},
         ),
     )
-
-
-def asyncpg_dsn(database_url: str) -> str:
-    """asyncpg expects `postgresql://`; SQLAlchemy URLs say `postgresql+asyncpg://`."""
-    return database_url.replace("postgresql+asyncpg://", "postgresql://", 1)

@@ -65,6 +65,12 @@ class HealthSettings(SettingsSection):
     check_timeout_ms: PositiveInt
 
 
+class DatabaseSettings(SettingsSection):
+    pool_size: PositiveInt
+    max_overflow: Annotated[int, Field(ge=0)]
+    pool_timeout_seconds: PositiveInt
+
+
 class StorageSettings(SettingsSection):
     endpoint_url: str
     access_key: SecretStr
@@ -83,6 +89,7 @@ class Settings(BaseSettings):
 
     profile: Profile
     database_url: SecretStr
+    database: DatabaseSettings
     redis_url: SecretStr
     storage: StorageSettings
     transcription: TranscriptionSettings

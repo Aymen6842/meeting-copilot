@@ -16,7 +16,16 @@ from tests.stack.compose_files import (
 SECRET_NAME = re.compile(r"PASSWORD|SECRET|_KEY|ROOT_USER")
 PLACEHOLDER_PREFIX = "change-me"
 PINNED_TAG = re.compile(r":[0-9][^:@]*$")  # a version tag, not "latest" or a bare name
-EXPECTED_SERVICES = {"postgres", "redis", "storage", "storage-init", "api", "worker", "web"}
+EXPECTED_SERVICES = {
+    "postgres",
+    "redis",
+    "storage",
+    "storage-init",
+    "migrate",
+    "api",
+    "worker",
+    "web",
+}
 
 
 def test_stack_has_every_expected_service() -> None:
@@ -100,3 +109,14 @@ def test_storage_init_never_grants_public_access() -> None:
 
     for forbidden in ("put-bucket-policy", "put-bucket-acl", "public-read", "anonymous"):
         assert forbidden not in init_command
+
+
+@pytest.mark.parametrize("name", ["api", "worker"])
+def test_app_services_start_only_after_migrations_succeed(name: str) -> None:
+    depends_on = services()[name]["depends_on"]
+
+    assert depends_on["migrate"]["condition"] == "service_completed_successfully"
+
+
+def test_migrate_receives_only_the_database_url() -> None:
+    assert set(services()["migrate"]["environment"]) == {"APP_DATABASE_URL"}
