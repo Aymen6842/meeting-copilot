@@ -12,6 +12,7 @@ from app.core.db import create_engine, create_session_factory
 from app.core.error_handlers import register_error_handlers
 from app.core.logging import add_request_logging, configure_logging
 from app.core.rate_limit import RateLimiter
+from app.core.storage import create_object_storage
 from app.health.routes import router as health_router
 from app.health.service import build_dependency_checks
 
@@ -37,10 +38,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     s3_client = create_s3_client(settings)
     app.state.session_factory = create_session_factory(engine)
     app.state.rate_limiter = RateLimiter(redis_client)
+    app.state.storage = create_object_storage(settings, s3_client)
     app.state.dependency_checks = build_dependency_checks(settings, engine, redis_client, s3_client)
     try:
         yield
     finally:
         await redis_client.aclose()
+        app.state.storage.close()
         s3_client.close()
         await engine.dispose()

@@ -7,6 +7,8 @@ x-app-environment: &app-environment
   APP_DATABASE_URL: &database-url postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
   APP_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
   APP_STORAGE__ENDPOINT_URL: http://storage:9000
+  # Browsers reach storage on the published port; pre-signed URLs are signed for this host.
+  APP_STORAGE__PUBLIC_ENDPOINT_URL: http://localhost:9000
   APP_STORAGE__ACCESS_KEY: ${STORAGE_ROOT_USER}
   APP_STORAGE__SECRET_KEY: ${STORAGE_ROOT_PASSWORD}
   APP_STORAGE__BUCKET: ${STORAGE_BUCKET}

@@ -99,6 +99,7 @@ filterwarnings = ["error"]
 dev = [
     "boto3-stubs[s3]>=1.44.6",
     "httpx>=0.28.1",
+    "hypothesis>=6.170.16",
     "mypy>=2.4.1",
     "pre-commit>=4.7.0",
     "pytest>=9.2.0",

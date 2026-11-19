@@ -43,6 +43,12 @@ class InvalidCredentialsError(AuthenticationError):
     code = "invalid_credentials"
 
 
+class StorageUnavailableError(DomainError):
+    """Object storage could not be reached or failed. Never carries keys or credentials."""
+
+    code = "storage_unavailable"
+
+
 class RateLimitExceededError(DomainError):
     code = "too_many_requests"
 

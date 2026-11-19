@@ -22,6 +22,8 @@ PROFILES: tuple[str, ...] = get_args(Profile)
 
 Probability = Annotated[float, Field(ge=0.0, le=1.0)]
 PositiveInt = Annotated[int, Field(gt=0)]
+# Pre-signed URLs are bearer links: keep them short-lived (an hour at most).
+UrlLifetimeSeconds = Annotated[int, Field(gt=0, le=3600)]
 
 
 class ConfigurationError(Exception):
@@ -87,10 +89,19 @@ class DatabaseSettings(SettingsSection):
 
 class StorageSettings(SettingsSection):
     endpoint_url: str
+    # Host that browsers use, signed into pre-signed URLs. Defaults to `endpoint_url`; differs
+    # when the API reaches storage on an internal name (http://storage:9000 in compose).
+    public_endpoint_url: str | None = None
     access_key: SecretStr
     secret_key: SecretStr
     bucket: str
     region: str = "us-east-1"
+    upload_url_ttl_seconds: UrlLifetimeSeconds
+    download_url_ttl_seconds: UrlLifetimeSeconds
+
+    @property
+    def signing_endpoint_url(self) -> str:
+        return self.public_endpoint_url or self.endpoint_url
 
 
 class Settings(BaseSettings):

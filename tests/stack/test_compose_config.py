@@ -1,6 +1,7 @@
 """Static checks on docker-compose.yml and .env.example. No Docker needed."""
 
 import re
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -120,3 +121,11 @@ def test_app_services_start_only_after_migrations_succeed(name: str) -> None:
 
 def test_migrate_receives_only_the_database_url() -> None:
     assert set(services()["migrate"]["environment"]) == {"APP_DATABASE_URL"}
+
+
+def test_presigned_urls_are_signed_for_the_published_storage_port() -> None:
+    public_url = urlsplit(services()["api"]["environment"]["APP_STORAGE__PUBLIC_ENDPOINT_URL"])
+    published_ports = [str(port) for port in services()["storage"]["ports"]]
+
+    assert public_url.hostname == "localhost"
+    assert f"127.0.0.1:{public_url.port}:9000" in published_ports

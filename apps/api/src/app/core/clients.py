@@ -1,6 +1,6 @@
 """Factories for clients to shared infrastructure, created once per process in the lifespan.
 
-The database engine lives in `core/db.py`; task 6 wraps the S3 client in `core/storage.py`.
+The database engine lives in `core/db.py`; `core/storage.py` wraps the S3 client.
 """
 
 from typing import TYPE_CHECKING
@@ -26,11 +26,12 @@ def create_redis_client(settings: Settings) -> redis.asyncio.Redis:
     )
 
 
-def create_s3_client(settings: Settings) -> "S3Client":
+def create_s3_client(settings: Settings, endpoint_url: str | None = None) -> "S3Client":
+    """`endpoint_url` overrides the configured one, e.g. the public host for signing URLs."""
     storage = settings.storage
     return boto3_client(
         "s3",
-        endpoint_url=storage.endpoint_url,
+        endpoint_url=endpoint_url or storage.endpoint_url,
         region_name=storage.region,
         aws_access_key_id=storage.access_key.get_secret_value(),
         aws_secret_access_key=storage.secret_key.get_secret_value(),

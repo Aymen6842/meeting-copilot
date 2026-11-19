@@ -20,6 +20,7 @@ from app.core.errors import (
     NotFoundError,
     PermissionDeniedError,
     RateLimitExceededError,
+    StorageUnavailableError,
 )
 
 STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
@@ -29,6 +30,7 @@ STATUS_BY_DOMAIN_ERROR: dict[type[DomainError], int] = {
     DomainValidationError: HTTPStatus.UNPROCESSABLE_ENTITY,
     AuthenticationError: HTTPStatus.UNAUTHORIZED,
     RateLimitExceededError: HTTPStatus.TOO_MANY_REQUESTS,
+    StorageUnavailableError: HTTPStatus.SERVICE_UNAVAILABLE,
 }
 
 # Fields of a validation error that are safe to return: never "input" (it may be a password)

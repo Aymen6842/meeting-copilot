@@ -7,6 +7,10 @@ database:
   max_overflow: 5
   pool_timeout_seconds: 10 # wait this long for a free connection before failing
 
+storage:                   # endpoint, credentials and bucket come from the environment
+  upload_url_ttl_seconds: 900    # pre-signed PUT for the browser upload
+  download_url_ttl_seconds: 300  # pre-signed GET for playback and download
+
 auth:
   session_ttl_hours: 168     # 7 days; the session is deleted at logout
   cookie_name: session
