@@ -8,6 +8,7 @@ __pycache__/
 .coverage
 htmlcov/
 *.egg-info/
+dist/
 
 # Node / Next.js
 node_modules/
@@ -32,6 +33,7 @@ eval/datasets/
 *.m4a
 *.flac
 *.webm
+*.mp4
 !tests/fixtures/**/*.wav
 
 # Editors and OS

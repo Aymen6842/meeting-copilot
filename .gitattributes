@@ -1,0 +1,16 @@
+# Store and check out text files with LF, also on Windows, so shell scripts and Docker
+# entrypoints keep working inside Linux containers.
+* text=auto eol=lf
+
+# Binary files: never touch line endings, never diff as text.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.wav  binary
+*.mp3  binary
+*.m4a  binary
+*.mp4  binary
+*.webm binary
+*.flac binary
