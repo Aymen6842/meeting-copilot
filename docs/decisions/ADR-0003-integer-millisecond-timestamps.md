@@ -33,7 +33,10 @@ be merged without losing or duplicating words.
 
 **Negative**
 - Many more rows (roughly 8,000–10,000 words per hour of speech). Needs indexes on
-  `(segment_id)` and `(run_id, start_ms)`; acceptable for Postgres at this scale.
+  `Segment (run_id, start_ms)` and `Word (segment_id, start_ms)`; acceptable for Postgres at
+  this scale. A time-range lookup for a run finds the segments first, then their words.
+  `Word` deliberately has no `run_id` column: it would duplicate data that `segment_id`
+  already implies and could drift out of sync.
 - Millisecond precision is finer than model accuracy; that is fine, but it must not be presented
   as accuracy.
 
