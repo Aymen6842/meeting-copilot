@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.pnpm-store/
+coverage/
+playwright-report/
+test-results/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Data, models and audio (never committed; downloaded by script)
+data/
+models/
+eval/datasets/
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.webm
+!tests/fixtures/**/*.wav
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local scratch
+Claude outputs/
