@@ -15,6 +15,7 @@ from app.core.rate_limit import RateLimiter
 from app.core.storage import create_object_storage
 from app.health.routes import router as health_router
 from app.health.service import build_dependency_checks
+from app.meetings.routes import router as meetings_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -27,6 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     add_request_logging(app)
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(meetings_router)
     return app
 
 

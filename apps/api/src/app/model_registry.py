@@ -7,7 +7,8 @@ Alembic (`migrations/env.py`) and the schema-drift test need all tables register
 
 from sqlalchemy import MetaData
 
-import app.auth.models  # noqa: F401 - registers the auth tables
+import app.auth.models  # registers the auth tables
+import app.meetings.models  # noqa: F401 - registers the meeting tables
 from app.core.db import Base
 
 

@@ -25,6 +25,10 @@ auth:
     attempts: 10
     window_seconds: 3600
 
+meetings:
+  max_upload_bytes: 4294967296  # 4 GiB; one pre-signed upload can never exceed 5 GiB
+  max_duration_ms: 10800000     # 3 hours (spec); checked again by the probe job
+
 transcription:
   provider: local        # local | hosted | fake | cached
   model: large-v3-turbo

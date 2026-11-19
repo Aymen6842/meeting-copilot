@@ -94,6 +94,7 @@ Object keys are namespaced by workspace: `workspaces/{workspace_id}/meetings/{me
 - [ ] Creating a meeting without `consent_confirmed = true` is rejected
 - [ ] A user cannot see or touch another workspace's meeting (explicit test)
 - [ ] Files over 3 hours or in unsupported formats are rejected with a clear message
+      (the duration the browser reports is checked here; the probe in task 8 measures it)
 
 ## Task 8: Job queue and a first worker job
 
@@ -106,6 +107,8 @@ heartbeat. Retries with backoff up to `max_attempts`. No GPU needed.
 - [ ] Upload a real file → meeting reaches `ready` with correct duration
 - [ ] A corrupt file → job retries, then the meeting is `failed` with a readable error
 - [ ] Running the same job twice gives the same result (idempotency test)
+- [ ] A recording longer than `meetings.max_duration_ms` (3 hours) is `failed` with a
+      readable error, whatever duration the browser reported
 
 ## Task 9: Typed API client
 

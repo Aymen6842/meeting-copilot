@@ -104,6 +104,15 @@ class StorageSettings(SettingsSection):
         return self.public_endpoint_url or self.endpoint_url
 
 
+# A pre-signed PUT is a single S3 upload, which S3 caps at 5 GiB.
+MAX_SINGLE_UPLOAD_BYTES = 5 * 1024**3
+
+
+class MeetingsSettings(SettingsSection):
+    max_upload_bytes: Annotated[int, Field(gt=0, le=MAX_SINGLE_UPLOAD_BYTES)]
+    max_duration_ms: PositiveInt
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="APP_",
@@ -118,6 +127,7 @@ class Settings(BaseSettings):
     redis_url: SecretStr
     storage: StorageSettings
     auth: AuthSettings
+    meetings: MeetingsSettings
     transcription: TranscriptionSettings
     diarization: DiarizationSettings
     uncertainty: UncertaintySettings

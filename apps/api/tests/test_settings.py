@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from app.core.config import (
     PROFILES,
     ConfigurationError,
+    Settings,
     load_settings,
     merge_dicts,
     read_yaml_mapping,
@@ -164,3 +165,25 @@ def test_merge_dicts_merges_nested_mappings_without_mutating_inputs() -> None:
 
     assert merged == {"a": {"x": 1, "y": 3}, "b": 1, "c": 4}
     assert base == {"a": {"x": 1, "y": 2}, "b": 1}
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("APP_MEETINGS__MAX_UPLOAD_BYTES", str(5 * 1024**3 + 1)),  # over one S3 PUT
+        ("APP_MEETINGS__MAX_UPLOAD_BYTES", "0"),
+        ("APP_MEETINGS__MAX_DURATION_MS", "0"),
+    ],
+)
+def test_meeting_limits_are_checked(
+    app_environment: pytest.MonkeyPatch, name: str, value: str
+) -> None:
+    app_environment.setenv(name, value)
+
+    with pytest.raises(ValidationError, match="max_"):
+        load_settings(CONFIG_DIR)
+
+
+def test_default_meeting_limits_match_the_spec(settings: Settings) -> None:
+    assert settings.meetings.max_duration_ms == 3 * 3_600_000
+    assert settings.meetings.max_upload_bytes == 4 * 1024**3

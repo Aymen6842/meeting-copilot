@@ -97,7 +97,7 @@ Every piece of text points back to a time span in the original audio. That singl
 
 | Entity | Key fields | Notes |
 | --- | --- | --- |
-| Meeting | id, title, recorded_at, duration_s, language_hint, status, consent_confirmed | One per uploaded recording |
+| Meeting | id, workspace_id, title, recorded_at, duration_ms, language_hint, status, consent_confirmed | One per uploaded recording; duration in integer milliseconds (ADR-0003) |
 | AudioAsset | id, meeting_id, storage_key, format, sample_rate, sha256 | Original file is never modified; a normalized 16 kHz mono copy is stored beside it |
 | ProcessingRun | id, meeting_id, provider, model, compute_type, config_json, started_at, finished_at, status | Every run is kept, so models can be compared on the same meeting |
 | Speaker | id, meeting_id, diarization_label, display_name | "SPEAKER_01" until the user renames it |
